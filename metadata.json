@@ -1,0 +1,7 @@
+{
+  "name": "Gesture Christmas Tree & Particles",
+  "description": "A 3D interactive particle system controlled by hand gestures. Transform a Christmas tree into various shapes using your webcam.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
