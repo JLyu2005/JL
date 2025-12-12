@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ShapeType, HandGestureState } from '../types';
 import { SHAPE_CONFIGS } from '../constants';
@@ -11,7 +12,8 @@ import {
   Heart,
   Star,
   Zap,
-  Box
+  Box,
+  BadgeCheck
 } from 'lucide-react';
 
 interface UIProps {
@@ -85,7 +87,6 @@ const UI: React.FC<UIProps> = ({
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold">5 Fingers Open</span>
                   <span className="text-[10px] uppercase text-white/70">Scatter & Rotate</span>
-                  {currentShape === ShapeType.TREE && <span className="text-[9px] text-green-400 mt-0.5 font-bold">ARMS MORPH</span>}
                 </div>
             </div>
 
@@ -95,7 +96,15 @@ const UI: React.FC<UIProps> = ({
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold">Fist</span>
                   <span className="text-[10px] uppercase text-white/70">Aggregate</span>
-                  {currentShape === ShapeType.TREE && <span className="text-[9px] text-green-400 mt-0.5 font-bold">TRIGGERS MORPH</span>}
+                </div>
+            </div>
+            
+            {/* VICTORY / TWO FINGERS */}
+            <div className={`flex items-center gap-3 ${gestureState.gesture === 'VICTORY' ? 'text-yellow-400' : 'text-white/50'}`}>
+                <BadgeCheck size={24} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold">2 Fingers (Peace)</span>
+                  <span className="text-[10px] uppercase text-white/70">Reveal Message</span>
                 </div>
             </div>
 

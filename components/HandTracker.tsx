@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { FilesetResolver, HandLandmarker, DrawingUtils } from '@mediapipe/tasks-vision';
 import { HandGestureState } from '../types';
@@ -174,23 +175,24 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                         const pinkyExt = isFingerExtended(20, 17);
 
                         // Classify Gesture
-                        let gesture: 'OPEN' | 'CLOSED' | 'POINTING' | 'NEUTRAL' = 'NEUTRAL';
+                        let gesture: 'OPEN' | 'CLOSED' | 'POINTING' | 'VICTORY' | 'NEUTRAL' = 'NEUTRAL';
                         
-                        // Strict counting
+                        // Strict counting for basics
                         const extendedCount = (thumbExt ? 1 : 0) + (indexExt ? 1 : 0) + (middleExt ? 1 : 0) + (ringExt ? 1 : 0) + (pinkyExt ? 1 : 0);
 
-                        if (extendedCount === 5) {
+                        // VICTORY / PEACE (Index + Middle extended, Ring + Pinky closed)
+                        // Thumb can be either, usually closed or tucked.
+                        if (indexExt && middleExt && !ringExt && !pinkyExt) {
+                            gesture = 'VICTORY';
+                        }
+                        else if (extendedCount === 5) {
                             gesture = 'OPEN';
                         } else if (extendedCount === 0) {
                             gesture = 'CLOSED';
                         } else if (extendedCount === 1 && indexExt) {
                             gesture = 'POINTING';
                         } else if (extendedCount === 2 && indexExt && thumbExt) {
-                            // Relaxed Pointing (Pistol shape often happens when trying to point)
-                            // But user asked for strict "5 fingers" for open.
-                            // We'll treat this as Pointing if users struggle, but for now stick to strict.
-                            // Let's bias towards NEUTRAL if ambiguous, or POINTING if we want to be nice.
-                            // For "inversion control", index is key.
+                            // "L" shape, usually treated as Pointing in this context
                             gesture = 'POINTING';
                         }
 
@@ -244,9 +246,7 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                         ctx.fillStyle = "white";
                         ctx.font = "14px sans-serif";
                         ctx.fillText(`Gesture: ${gesture}`, 10, 20);
-                        if (gesture === 'OPEN') ctx.fillText('Rotation: UNLOCKED', 10, 40);
-                        if (gesture === 'POINTING') ctx.fillText('Pitch: UNLOCKED', 10, 40);
-                        if (gesture === 'CLOSED') ctx.fillText('Position: LOCKED', 10, 40);
+                        if (gesture === 'VICTORY') ctx.fillText('Mode: CHRISTMAS TEXT', 10, 40);
 
                     } else {
                         // Keep last known states

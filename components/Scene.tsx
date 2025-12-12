@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -5,6 +6,17 @@ import { OrbitControls } from '@react-three/drei';
 import Particles from './Particles';
 import { ShapeType, HandGestureState } from '../types';
 import { CAMERA_POSITION, CAMERA_FOV } from '../constants';
+
+// Fix for Missing JSX Types in R3F
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      color: any;
+      fog: any;
+      ambientLight: any;
+    }
+  }
+}
 
 interface SceneProps {
   currentShape: ShapeType;
@@ -16,8 +28,12 @@ const Scene: React.FC<SceneProps> = ({ currentShape, currentColor, gestureState 
   return (
     <Canvas
       camera={{ position: [...CAMERA_POSITION], fov: CAMERA_FOV }}
-      gl={{ antialias: false, alpha: true }} // Alpha true for background CSS gradient visibility
-      dpr={[1, 2]}
+      gl={{ 
+        antialias: false, // Post-processing handles AA usually
+        alpha: true,
+        powerPreference: "high-performance"
+      }}
+      dpr={[1, 2]} // Limit pixel ratio to prevent crash on high-res screens
     >
       <color attach="background" args={['#000000']} />
       
@@ -32,8 +48,11 @@ const Scene: React.FC<SceneProps> = ({ currentShape, currentColor, gestureState 
         gestureState={gestureState} 
       />
 
-      {/* Fixed: disableNormalPass is not a valid prop, use enableNormalPass={false} instead */}
-      <EffectComposer enableNormalPass={false}>
+      {/* 
+        multisampling={0} is CRITICAL for preventing black screens 
+        when using WebGL2 + PostProcessing on certain GPUs/Browsers.
+      */}
+      <EffectComposer disableNormalPass multisampling={0}>
         <Bloom 
           luminanceThreshold={0.2} 
           mipmapBlur 

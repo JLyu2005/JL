@@ -1,9 +1,22 @@
+
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PARTICLE_COUNT } from '../constants';
 import { ShapeType, HandGestureState } from '../types';
 import { generateParticles, generateTextParticles } from '../utils/geometry';
+
+// Fix for Missing JSX Types in R3F
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      points: any;
+      bufferGeometry: any;
+      bufferAttribute: any;
+      shaderMaterial: any;
+    }
+  }
+}
 
 interface ParticlesProps {
   shape: ShapeType;
@@ -111,40 +124,29 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
   
   // "Morph Target" determines if we are rendering the Tree or the Text
   const [morphTarget, setMorphTarget] = useState<'TREE' | 'TEXT'>('TREE');
-  
-  // "Armed" state: 
-  // We arm the morph trigger when the hand is OPEN (Scattered).
-  // We fire the morph trigger when the hand becomes CLOSED (Aggregated).
-  // This persistence prevents "Neutral" states from breaking the flow.
-  const isMorphArmed = useRef(false);
 
   // --- MORPHING STATE MACHINE ---
   useEffect(() => {
-    // This logic only applies when the base shape is the Tree.
+    // Only apply morph logic if base shape is Tree
     if (shape !== ShapeType.TREE) {
       if (morphTarget === 'TEXT') setMorphTarget('TREE');
-      isMorphArmed.current = false;
       return;
     }
 
-    // 1. Arm the trigger if hand is fully OPEN (Scatter)
-    if (gestureState.gesture === 'OPEN') {
-      isMorphArmed.current = true;
+    // Direct mapping: Victory gesture shows text, others show tree
+    if (gestureState.gesture === 'VICTORY') {
+      setMorphTarget('TEXT');
+    } else {
+      setMorphTarget('TREE');
     }
-
-    // 2. Fire the trigger if hand is CLOSED (Fist) AND it was previously armed
-    if (gestureState.gesture === 'CLOSED' && isMorphArmed.current) {
-      setMorphTarget(prev => prev === 'TREE' ? 'TEXT' : 'TREE');
-      isMorphArmed.current = false; // Disarm until next scatter
-    }
-  }, [gestureState.gesture, shape, morphTarget]);
+  }, [gestureState.gesture, shape]);
 
 
   // --- GEOMETRY GENERATION ---
   const targetData = useMemo(() => {
     // Case 1: Special Text Mode (Only works if base shape is Tree)
     if (shape === ShapeType.TREE && morphTarget === 'TEXT') {
-      return generateTextParticles("Merry\nChristmas", PARTICLE_COUNT, '#ffcc00'); // Gold text
+      return generateTextParticles("Merry\nChristmas", PARTICLE_COUNT, '#ffcc00'); // Color ignored by updated function
     }
     // Case 2: Standard Shapes
     return generateParticles(shape, PARTICLE_COUNT, color);
@@ -189,6 +191,11 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
         targetExpansion = 1.5; 
         targetScatter = 1.0;   // Full scatter
         targetNoiseAmp = 0.1;
+    } else if (gestureState.gesture === 'VICTORY') {
+        // VICTORY (TEXT): Stable, maybe slightly larger
+        targetExpansion = 1.2;
+        targetScatter = 0.0;
+        targetNoiseAmp = 0.02; 
     } else if (gestureState.gesture === 'POINTING') {
         // POINTING: Standard view, controllable
         targetExpansion = 1.0;
@@ -196,7 +203,6 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
         targetNoiseAmp = 0.05; 
     } else {
         // NEUTRAL: Default breathing state
-        // Note: Neutral does NOT reset the morph cycle
         targetExpansion = 1.0;
         targetScatter = 0.0;
         targetNoiseAmp = 0.1;
@@ -213,14 +219,12 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
         // Y-AXIS ROTATION (Left/Right) - Controlled by Open Hand "Swing"
         if (gestureState.gesture === 'OPEN') {
              // Map gesture rotation (-1 to 1) to a wide angle (approx 540 degrees)
-             // This gives the feeling of "winding up" or spinning the model
              const targetRotationY = gestureState.rotation * Math.PI * 3.0; 
              pointsRef.current.rotation.y = THREE.MathUtils.lerp(pointsRef.current.rotation.y, targetRotationY, delta * 2.0);
         }
         
         // X-AXIS ROTATION (Up/Down) - Controlled by Pointing Finger (Invert)
         if (gestureState.gesture === 'POINTING') {
-             // Map pitch (-1 to 1) to a full flip (180 deg / PI)
              const targetRotationX = gestureState.pitch * Math.PI; 
              pointsRef.current.rotation.x = THREE.MathUtils.lerp(pointsRef.current.rotation.x, targetRotationX, delta * 2.0);
         } else {

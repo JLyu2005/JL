@@ -1,25 +1,28 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-        base: '/JL/',
-        
-        server: {
-            port: 3000,
-            host: '0.0.0.0',
-        },
-        plugins: [react()],
-        define: {
-            'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-            'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-        },
-        resolve: {
-            alias: {
-                '@': path.resolve(__dirname, '.'),
-            }
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  // CRITICAL: Set base to './' so assets load correctly on GitHub Pages subdirectories
+  base: './', 
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    // Helps with chunking large Three.js files to prevent loading errors
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          react: ['react', 'react-dom'],
+          mediapipe: ['@mediapipe/tasks-vision']
         }
-    };
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  },
+  optimizeDeps: {
+    exclude: ['@mediapipe/tasks-vision'] // Prevent double-bundling issues with WASM
+  }
 });

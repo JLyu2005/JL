@@ -1,3 +1,4 @@
+
 import { ShapeType } from '../types';
 import * as THREE from 'three';
 
@@ -23,7 +24,12 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
 
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const baseColor = new THREE.Color(baseColorHex);
+  
+  // Festive Palette
+  const red = new THREE.Color('#c1121f');
+  const green = new THREE.Color('#2f5a2f');
+  const gold = new THREE.Color('#ffd700');
+  const white = new THREE.Color('#ffffff');
 
   if (!ctx) return { positions, colors };
 
@@ -31,14 +37,15 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = '#ffffff';
-  // Use a very bold font for maximum particle surface area
-  ctx.font = '900 180px "Arial Black", "Inter", sans-serif'; 
+  
+  // Christmas Style Font: Serif, Italic
+  ctx.font = 'italic 700 160px "Times New Roman", serif'; 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   // 2. Draw Text (Multiline support)
   const lines = text.split('\n');
-  const lineHeight = 200;
+  const lineHeight = 180;
   const totalHeight = lines.length * lineHeight;
   const startY = (size / 2) - (totalHeight / 2) + (lineHeight / 2);
 
@@ -51,7 +58,7 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
   const data = imageData.data;
   const validPixels: number[] = [];
 
-  // Optimization: Scan step 2 or 4 to save time, we just need coordinate list
+  // Optimization: Scan step 2 or 4 to save time
   for (let i = 0; i < data.length; i += 4) {
     if (data[i] > 50) { // If pixel is bright enough
       validPixels.push(i / 4);
@@ -75,20 +82,27 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
     const py = Math.floor(pixelIndex / size);
 
     // Map 2D pixel to 3D space (-10 to 10 range approximately)
-    const x = (px / size - 0.5) * 20; 
-    const y = -(py / size - 0.5) * 20; // Invert Y
-    const z = (Math.random() - 0.5) * 1.0; // Shallow depth for text readability
+    const x = (px / size - 0.5) * 22; 
+    const y = -(py / size - 0.5) * 22; // Invert Y
+    const z = (Math.random() - 0.5) * 1.5; // Slight depth
 
     positions[i3] = x;
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
 
-    // Add Color Variation
-    // Brighter toward center of letters? Or just random twinkle.
-    const variation = Math.random() * 0.3;
-    colors[i3] = Math.min(1, baseColor.r + variation);
-    colors[i3 + 1] = Math.min(1, baseColor.g + variation);
-    colors[i3 + 2] = Math.min(1, baseColor.b + variation);
+    // Custom Festive Coloring
+    const rand = Math.random();
+    let finalColor;
+    
+    // Mix Red, Green, Gold and White
+    if (rand > 0.7) finalColor = gold;
+    else if (rand > 0.4) finalColor = red;
+    else if (rand > 0.15) finalColor = green;
+    else finalColor = white;
+
+    colors[i3] = finalColor.r;
+    colors[i3 + 1] = finalColor.g;
+    colors[i3 + 2] = finalColor.b;
   }
 
   return { positions, colors };

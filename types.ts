@@ -1,3 +1,4 @@
+
 export enum ShapeType {
   TREE = 'Tree',
   HEART = 'Heart',
@@ -8,7 +9,7 @@ export enum ShapeType {
 
 export interface HandGestureState {
   isHandDetected: boolean;
-  gesture: 'OPEN' | 'CLOSED' | 'POINTING' | 'NEUTRAL';
+  gesture: 'OPEN' | 'CLOSED' | 'POINTING' | 'VICTORY' | 'NEUTRAL';
   rotation: number; // Y-axis (Yaw) - Normalized -1 to 1
   pitch: number;    // X-axis (Pitch) - Normalized -1 to 1
   pinchDistance: number; // 0 to 1
