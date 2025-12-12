@@ -15,7 +15,7 @@ function randomSpherePoint(radius: number) {
 }
 
 // Generate particles for text by scanning an HTML5 Canvas
-export const generateTextParticles = (text: string, count: number, baseColorHex: string): { positions: Float32Array, colors: Float32Array } => {
+export const generateTextParticles = (text: string, count: number, theme: 'CHRISTMAS' | 'ROMANTIC' = 'CHRISTMAS'): { positions: Float32Array, colors: Float32Array } => {
   const size = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -25,12 +25,6 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   
-  // Festive Palette
-  const red = new THREE.Color('#c1121f');
-  const green = new THREE.Color('#2f5a2f');
-  const gold = new THREE.Color('#ffd700');
-  const white = new THREE.Color('#ffffff');
-
   if (!ctx) return { positions, colors };
 
   // 1. Setup Canvas
@@ -38,8 +32,16 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = '#ffffff';
   
-  // Christmas Style Font: Serif, Italic
-  ctx.font = 'italic 700 160px "Times New Roman", serif'; 
+  // Font Selection based on Theme
+  if (theme === 'ROMANTIC') {
+    // Elegant cursive/script font for "Love You"
+    // Fallback stack ensures it looks like handwriting on most systems
+    ctx.font = '400 180px "Brush Script MT", "Lucida Calligraphy", "Segoe Script", "Apple Chancery", cursive';
+  } else {
+    // Classic serif for "Merry Christmas"
+    ctx.font = 'italic 700 160px "Times New Roman", serif'; 
+  }
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -90,15 +92,35 @@ export const generateTextParticles = (text: string, count: number, baseColorHex:
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
 
-    // Custom Festive Coloring
+    // Custom Theme Coloring
     const rand = Math.random();
     let finalColor;
     
-    // Mix Red, Green, Gold and White
-    if (rand > 0.7) finalColor = gold;
-    else if (rand > 0.4) finalColor = red;
-    else if (rand > 0.15) finalColor = green;
-    else finalColor = white;
+    if (theme === 'ROMANTIC') {
+        // Romantic Palette: Hot Pink, Soft Pink, Red, White
+        const hotPink = new THREE.Color('#ff1493');
+        const softPink = new THREE.Color('#ffb7b2');
+        const red = new THREE.Color('#e63946');
+        const white = new THREE.Color('#ffffff');
+
+        // Distribution favoring pinks/reds
+        if (rand > 0.8) finalColor = white;
+        else if (rand > 0.5) finalColor = softPink;
+        else if (rand > 0.2) finalColor = hotPink;
+        else finalColor = red;
+        
+    } else {
+        // Christmas Palette: Gold, Red, Green, White
+        const red = new THREE.Color('#c1121f');
+        const green = new THREE.Color('#2f5a2f');
+        const gold = new THREE.Color('#ffd700');
+        const white = new THREE.Color('#ffffff');
+
+        if (rand > 0.7) finalColor = gold;
+        else if (rand > 0.4) finalColor = red;
+        else if (rand > 0.15) finalColor = green;
+        else finalColor = white;
+    }
 
     colors[i3] = finalColor.r;
     colors[i3 + 1] = finalColor.g;

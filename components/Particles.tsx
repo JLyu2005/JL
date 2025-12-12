@@ -122,18 +122,19 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
   const geometryRef = useRef<THREE.BufferGeometry>(null);
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
   
-  // "Morph Target" determines if we are rendering the Tree or the Text
+  // "Morph Target" determines if we are rendering the Shape (TREE/HEART) or the Text (TEXT)
+  // 'TREE' here represents the default "Shape State" (legacy naming in code, logically means "Current Shape")
   const [morphTarget, setMorphTarget] = useState<'TREE' | 'TEXT'>('TREE');
 
   // --- MORPHING STATE MACHINE ---
   useEffect(() => {
-    // Only apply morph logic if base shape is Tree
-    if (shape !== ShapeType.TREE) {
+    // Only apply morph logic if base shape is Tree or Heart
+    if (shape !== ShapeType.TREE && shape !== ShapeType.HEART) {
       if (morphTarget === 'TEXT') setMorphTarget('TREE');
       return;
     }
 
-    // Direct mapping: Victory gesture shows text, others show tree
+    // Direct mapping: Victory gesture shows text
     if (gestureState.gesture === 'VICTORY') {
       setMorphTarget('TEXT');
     } else {
@@ -144,9 +145,13 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
 
   // --- GEOMETRY GENERATION ---
   const targetData = useMemo(() => {
-    // Case 1: Special Text Mode (Only works if base shape is Tree)
-    if (shape === ShapeType.TREE && morphTarget === 'TEXT') {
-      return generateTextParticles("Merry\nChristmas", PARTICLE_COUNT, '#ffcc00'); // Color ignored by updated function
+    // Case 1: Special Text Mode
+    if (morphTarget === 'TEXT') {
+       if (shape === ShapeType.TREE) {
+         return generateTextParticles("Merry\nChristmas", PARTICLE_COUNT, 'CHRISTMAS');
+       } else if (shape === ShapeType.HEART) {
+         return generateTextParticles("Love\nYou", PARTICLE_COUNT, 'ROMANTIC');
+       }
     }
     // Case 2: Standard Shapes
     return generateParticles(shape, PARTICLE_COUNT, color);
