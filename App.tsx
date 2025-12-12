@@ -14,6 +14,7 @@ function App() {
     isHandDetected: false,
     gesture: 'NEUTRAL',
     rotation: 0,
+    pitch: 0, // Added missing property
     pinchDistance: 0.5
   });
 
