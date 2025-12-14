@@ -1,19 +1,9 @@
-
 import React from 'react';
 import { ShapeType, HandGestureState } from '../types';
 import { SHAPE_CONFIGS } from '../constants';
 import { 
-  Maximize2, 
-  Minimize2, 
-  Hand, 
-  Grab, 
-  MousePointer2,
-  TreePine,
-  Heart,
-  Star,
-  Zap,
-  Box,
-  BadgeCheck
+  Maximize2, Minimize2, Hand, Grab, MousePointer2,
+  TreePine, Heart, Star, Zap, Box, BadgeCheck
 } from 'lucide-react';
 
 interface UIProps {
@@ -27,13 +17,8 @@ interface UIProps {
 }
 
 const UI: React.FC<UIProps> = ({
-  currentShape,
-  setShape,
-  currentColor,
-  setColor,
-  gestureState,
-  isFullscreen,
-  toggleFullscreen
+  currentShape, setShape, currentColor, setColor,
+  gestureState, isFullscreen, toggleFullscreen
 }) => {
 
   const getIcon = (shape: ShapeType) => {
@@ -49,8 +34,6 @@ const UI: React.FC<UIProps> = ({
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
-      
-      {/* Header / Status */}
       <div className="flex justify-between items-start pointer-events-auto">
         <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-yellow-500 drop-shadow-sm filter">
@@ -61,80 +44,54 @@ const UI: React.FC<UIProps> = ({
                 {gestureState.isHandDetected ? 'Hand Detected' : 'No Hand Detected'}
             </div>
         </div>
-
-        <button 
-          onClick={toggleFullscreen}
-          className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/10"
-        >
+        <button onClick={toggleFullscreen} className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/10">
           {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </button>
       </div>
 
-      {/* Gesture Guide */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-500 pointer-events-none ${gestureState.isHandDetected ? 'opacity-30' : 'opacity-80'}`}>
-         {!gestureState.isHandDetected && (
-            <div className="text-center space-y-4">
-                <p className="text-white/80 text-lg font-light tracking-wide">Raise your hand to control</p>
-            </div>
-         )}
-      </div>
-
       <div className={`absolute top-1/2 right-6 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto transition-opacity duration-300 ${gestureState.isHandDetected ? 'opacity-100' : 'opacity-0'}`}>
-         <div className="bg-black/50 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-4 shadow-xl w-48">
-            {/* OPEN HAND */}
-            <div className={`flex items-center gap-3 ${gestureState.gesture === 'OPEN' ? 'text-yellow-400' : 'text-white/50'}`}>
-                <Hand size={24} />
+         <div className="bg-black/50 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-4 shadow-xl w-56">
+            <div className="flex items-center gap-3 text-white">
+                <Hand size={24} className="text-yellow-400"/>
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold">5 Fingers Open</span>
-                  <span className="text-[10px] uppercase text-white/70">Scatter & Rotate</span>
+                  <span className="text-sm font-semibold">Open Slowly</span>
+                  <span className="text-[10px] uppercase text-white/70">Expands & Scatters</span>
+                  {/* Progress Bar for Openness */}
+                  <div className="w-full h-1 bg-white/20 mt-1 rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-yellow-400 transition-all duration-100" 
+                        style={{ width: `${gestureState.pinchDistance * 100}%` }}
+                    />
+                  </div>
                 </div>
             </div>
 
-            {/* FIST */}
-            <div className={`flex items-center gap-3 ${gestureState.gesture === 'CLOSED' ? 'text-yellow-400' : 'text-white/50'}`}>
-                <Grab size={24} />
+            <div className="flex items-center gap-3 text-white">
+                <Grab size={24} className="text-yellow-400"/>
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold">Fist</span>
-                  <span className="text-[10px] uppercase text-white/70">Aggregate</span>
+                  <span className="text-sm font-semibold">Close (Fist)</span>
+                  <span className="text-[10px] uppercase text-white/70">Condenses Particle</span>
                 </div>
             </div>
             
-            {/* VICTORY / TWO FINGERS */}
             <div className={`flex items-center gap-3 ${gestureState.gesture === 'VICTORY' ? 'text-yellow-400' : 'text-white/50'}`}>
                 <BadgeCheck size={24} />
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold">2 Fingers (Peace)</span>
+                  <span className="text-sm font-semibold">Peace Sign</span>
                   <span className="text-[10px] uppercase text-white/70">Reveal Message</span>
-                </div>
-            </div>
-
-            {/* POINTING */}
-            <div className={`flex items-center gap-3 ${gestureState.gesture === 'POINTING' ? 'text-yellow-400' : 'text-white/50'}`}>
-                <MousePointer2 size={24} className="transform -rotate-45" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold">One Finger</span>
-                  <span className="text-[10px] uppercase text-white/70">Flip / Invert</span>
                 </div>
             </div>
          </div>
       </div>
 
-      {/* Bottom Controls */}
       <div className="flex flex-col md:flex-row items-end md:items-center gap-6 pointer-events-auto w-full md:w-auto mx-auto bg-black/60 backdrop-blur-lg p-4 rounded-2xl border border-white/10">
-        
-        {/* Shape Selector */}
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
           {Object.values(ShapeType).map((shape) => (
             <button
               key={shape}
-              onClick={() => {
-                setShape(shape);
-                setColor(SHAPE_CONFIGS[shape].color);
-              }}
+              onClick={() => { setShape(shape); setColor(SHAPE_CONFIGS[shape].color); }}
               className={`p-3 rounded-xl transition-all flex items-center gap-2 min-w-[100px] border ${
-                currentShape === shape 
-                  ? 'bg-white/20 border-yellow-500/50 text-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.3)]' 
-                  : 'bg-transparent border-transparent text-white/60 hover:bg-white/5'
+                currentShape === shape ? 'bg-white/20 border-yellow-500/50 text-yellow-300' : 'bg-transparent border-transparent text-white/60 hover:bg-white/5'
               }`}
             >
               {getIcon(shape)}
@@ -142,26 +99,14 @@ const UI: React.FC<UIProps> = ({
             </button>
           ))}
         </div>
-
         <div className="h-8 w-[1px] bg-white/20 hidden md:block"></div>
-
-        {/* Color Picker */}
         <div className="flex items-center gap-3">
           <label className="text-xs uppercase tracking-wider text-white/60">Color</label>
           <div className="relative group">
-             <input
-                type="color"
-                value={currentColor}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-10 h-10 rounded-full cursor-pointer opacity-0 absolute inset-0 z-10"
-             />
-             <div 
-                className="w-10 h-10 rounded-full border-2 border-white/30 shadow-inner"
-                style={{ backgroundColor: currentColor }}
-             />
+             <input type="color" value={currentColor} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 rounded-full cursor-pointer opacity-0 absolute inset-0 z-10" />
+             <div className="w-10 h-10 rounded-full border-2 border-white/30 shadow-inner" style={{ backgroundColor: currentColor }} />
           </div>
         </div>
-
       </div>
     </div>
   );
