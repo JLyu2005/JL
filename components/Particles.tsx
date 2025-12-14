@@ -54,7 +54,8 @@ const ParticleShaderMaterial = {
       vColor = color;
       
       // Gentle twinkle
-      float twinkle = sin(uTime * 3.0 + aRandom * 100.0) * 0.5 + 0.5;
+      float twinkleSpeed = 3.0 + (uScatter * 10.0); // Sparkle faster when scattered
+      float twinkle = sin(uTime * twinkleSpeed + aRandom * 100.0) * 0.5 + 0.5;
       
       // 1. Calculate Shape Position (with Expansion/Contraction)
       vec3 shapePos = position * uExpansion;
@@ -86,8 +87,8 @@ const ParticleShaderMaterial = {
       // Make Gold/Red particles slightly larger (ornaments)
       if (color.r > 0.8 && color.g < 0.2) sizeMult = 1.5; 
       
-      // Reduce particle size slightly when scattered to look like dust
-      float scatterSizeMod = mix(1.0, 0.7, mixFactor);
+      // When scattered (Open Hand), boost size to look like floating diamonds
+      float scatterSizeMod = mix(1.0, 1.3, mixFactor);
       
       gl_PointSize = (uPointSize * sizeMult * scatterSizeMod + twinkle * 2.0) * uPixelRatio * (10.0 / -mvPosition.z);
       
@@ -105,11 +106,14 @@ const ParticleShaderMaterial = {
       float dist = length(center);
       if (dist > 0.5) discard;
       
-      // Soft glow gradient
+      // Crystal/Diamond like glow
       float glow = 1.0 - (dist * 2.0);
-      glow = pow(glow, 1.5);
+      glow = pow(glow, 2.0); // Sharper glow for jewelry look
       
-      gl_FragColor = vec4(vColor + (glow * 0.3), vAlpha * glow);
+      // Add white core to make it look shiny
+      vec3 finalColor = mix(vColor, vec3(1.0), glow * 0.5);
+      
+      gl_FragColor = vec4(finalColor + (glow * 0.3), vAlpha * glow);
     }
   `,
   transparent: true,
@@ -123,7 +127,6 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
   
   // "Morph Target" determines if we are rendering the Shape (TREE/HEART) or the Text (TEXT)
-  // 'TREE' here represents the default "Shape State" (legacy naming in code, logically means "Current Shape")
   const [morphTarget, setMorphTarget] = useState<'TREE' | 'TEXT'>('TREE');
 
   // --- MORPHING STATE MACHINE ---
@@ -168,8 +171,8 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
         r[i] = Math.random();
         // Scatter range: -15 to 15
-        rp[i * 3] = (Math.random() - 0.5) * 30;     
-        rp[i * 3 + 1] = (Math.random() - 0.5) * 30; 
+        rp[i * 3] = (Math.random() - 0.5) * 35;     
+        rp[i * 3 + 1] = (Math.random() - 0.5) * 35; 
         rp[i * 3 + 2] = (Math.random() - 0.5) * 20; 
     }
     return { randoms: r, randomPositions: rp };
@@ -186,35 +189,31 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
     let targetScatter = 0.0;
     let targetNoiseAmp = 0.1;
     
+    // Explicit Hand Control Mapping
     if (gestureState.gesture === 'CLOSED') {
-        // FIST: Aggregate tightly & Stabilize
-        targetExpansion = 0.7; // Compact
-        targetScatter = 0.0;   // No scatter
-        targetNoiseAmp = 0.02; // Very stable
+        // FIST (Closed): Aggregate tightly into a "Jewel" or dense object
+        targetExpansion = 0.6; // Very compact
+        targetScatter = 0.0;   
+        targetNoiseAmp = 0.01; // Solid, no wobble
     } else if (gestureState.gesture === 'OPEN') {
-        // OPEN HAND: Explode/Scatter
-        targetExpansion = 1.5; 
-        targetScatter = 1.0;   // Full scatter
-        targetNoiseAmp = 0.1;
+        // OPEN HAND: Explode/Scatter like glitter
+        targetExpansion = 2.0; 
+        targetScatter = 1.0;   
+        targetNoiseAmp = 0.2;
     } else if (gestureState.gesture === 'VICTORY') {
-        // VICTORY (TEXT): Stable, maybe slightly larger
+        // VICTORY: Text display
         targetExpansion = 1.2;
         targetScatter = 0.0;
         targetNoiseAmp = 0.02; 
-    } else if (gestureState.gesture === 'POINTING') {
-        // POINTING: Standard view, controllable
-        targetExpansion = 1.0;
-        targetScatter = 0.0;
-        targetNoiseAmp = 0.05; 
     } else {
         // NEUTRAL: Default breathing state
         targetExpansion = 1.0;
         targetScatter = 0.0;
-        targetNoiseAmp = 0.1;
+        targetNoiseAmp = 0.08;
     }
 
     // 2. Smoothly Lerp Uniforms
-    const lerpFactor = delta * 4.0;
+    const lerpFactor = delta * 3.5;
     uniforms.uExpansion.value = THREE.MathUtils.lerp(uniforms.uExpansion.value, targetExpansion, lerpFactor);
     uniforms.uScatter.value = THREE.MathUtils.lerp(uniforms.uScatter.value, targetScatter, lerpFactor);
     uniforms.uNoiseAmp.value = THREE.MathUtils.lerp(uniforms.uNoiseAmp.value, targetNoiseAmp, lerpFactor);
@@ -223,20 +222,18 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
     if (gestureState.isHandDetected) {
         // Y-AXIS ROTATION (Left/Right) - Controlled by Open Hand "Swing"
         if (gestureState.gesture === 'OPEN') {
-             // Map gesture rotation (-1 to 1) to a wide angle (approx 540 degrees)
-             const targetRotationY = gestureState.rotation * Math.PI * 3.0; 
+             const targetRotationY = gestureState.rotation * Math.PI * 2.0; 
              pointsRef.current.rotation.y = THREE.MathUtils.lerp(pointsRef.current.rotation.y, targetRotationY, delta * 2.0);
         }
         
-        // X-AXIS ROTATION (Up/Down) - Controlled by Pointing Finger (Invert)
+        // X-AXIS ROTATION (Up/Down) - Controlled by Pointing Finger
         if (gestureState.gesture === 'POINTING') {
              const targetRotationX = gestureState.pitch * Math.PI; 
              pointsRef.current.rotation.x = THREE.MathUtils.lerp(pointsRef.current.rotation.x, targetRotationX, delta * 2.0);
         } else {
-             // If not pointing, gently return pitch to 0
+             // Return to level
              pointsRef.current.rotation.x = THREE.MathUtils.lerp(pointsRef.current.rotation.x, 0, delta * 2.0);
         }
-
     } else {
         // Idle Auto-Rotation
         pointsRef.current.rotation.y += delta * 0.15;
@@ -247,7 +244,6 @@ const Particles: React.FC<ParticlesProps> = ({ shape, color, gestureState }) => 
     const positions = geometryRef.current.attributes.position.array as Float32Array;
     const colors = geometryRef.current.attributes.color.array as Float32Array;
     
-    // Speed of particles moving to new shape slots
     const morphSpeed = delta * 4.0; 
     const colorSpeed = delta * 3.0;
 

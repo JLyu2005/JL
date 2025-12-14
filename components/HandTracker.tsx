@@ -22,9 +22,11 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
   const lastVideoTime = useRef(-1);
   const lastRotationRef = useRef<number>(0);
   const lastPitchRef = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // 1. Initialize AI (MediaPipe)
   useEffect(() => {
+    let isMounted = true;
     const initAI = async () => {
       try {
         setAiState('LOADING');
@@ -32,9 +34,11 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
         );
         
+        if (!isMounted) return;
+
         // Try GPU, fallback to CPU
         try {
-            landmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
+            const landmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
                     delegate: "GPU"
@@ -45,9 +49,10 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                 minHandPresenceConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
+            if (isMounted) landmarkerRef.current = landmarker;
         } catch (e) {
             console.warn("GPU Failed, using CPU", e);
-            landmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
+            const landmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
                     delegate: "CPU"
@@ -55,22 +60,37 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                 runningMode: "VIDEO",
                 numHands: 1
             });
+            if (isMounted) landmarkerRef.current = landmarker;
         }
-        setAiState('READY');
+        if (isMounted) setAiState('READY');
       } catch (err) {
         console.error("AI Init Failed", err);
-        setAiState('ERROR');
+        if (isMounted) setAiState('ERROR');
       }
     };
     initAI();
 
     return () => {
+        isMounted = false;
         if (landmarkerRef.current) landmarkerRef.current.close();
     };
   }, []);
 
   // 2. Initialize Camera Function
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsPlaying(false);
+  };
+
   const startCamera = async () => {
+    stopCamera(); // Ensure previous stream is closed
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       console.error("getUserMedia not supported");
       setCameraState('ERROR');
@@ -87,6 +107,8 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
         },
         audio: false
       });
+
+      streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -116,11 +138,7 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
   useEffect(() => {
     startCamera();
     return () => {
-        // Cleanup stream
-        if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(t => t.stop());
-        }
+        stopCamera();
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
   }, []);
@@ -155,17 +173,16 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                         
                         // Visual Debug
                         const drawingUtils = new DrawingUtils(ctx);
-                        drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: "rgba(0, 255, 0, 0.5)", lineWidth: 1 });
-                        drawingUtils.drawLandmarks(landmarks, { color: "rgba(255, 0, 0, 0.8)", lineWidth: 1, radius: 2 });
+                        drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: "rgba(0, 255, 0, 0.3)", lineWidth: 1 });
+                        drawingUtils.drawLandmarks(landmarks, { color: "rgba(255, 255, 255, 0.5)", lineWidth: 1, radius: 2 });
 
                         const wrist = landmarks[0];
                         
                         // --- FINGER STATE DETECTION ---
-                        // Helper: Check if finger tip is significantly further from wrist than its knuckle (MCP)
                         const isFingerExtended = (tipIdx: number, mcpIdx: number) => {
                             const distTip = Math.sqrt(Math.pow(landmarks[tipIdx].x - wrist.x, 2) + Math.pow(landmarks[tipIdx].y - wrist.y, 2));
                             const distMcp = Math.sqrt(Math.pow(landmarks[mcpIdx].x - wrist.x, 2) + Math.pow(landmarks[mcpIdx].y - wrist.y, 2));
-                            return distTip > distMcp * 1.2;
+                            return distTip > distMcp * 1.1; // Lower threshold for easier triggering
                         };
 
                         const thumbExt = isFingerExtended(4, 2);
@@ -174,63 +191,45 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                         const ringExt = isFingerExtended(16, 13);
                         const pinkyExt = isFingerExtended(20, 17);
 
-                        // Classify Gesture
                         let gesture: 'OPEN' | 'CLOSED' | 'POINTING' | 'VICTORY' | 'NEUTRAL' = 'NEUTRAL';
-                        
-                        // Strict counting for basics
                         const extendedCount = (thumbExt ? 1 : 0) + (indexExt ? 1 : 0) + (middleExt ? 1 : 0) + (ringExt ? 1 : 0) + (pinkyExt ? 1 : 0);
 
-                        // VICTORY / PEACE (Index + Middle extended, Ring + Pinky closed)
-                        // Thumb can be either, usually closed or tucked.
-                        if (indexExt && middleExt && !ringExt && !pinkyExt) {
-                            gesture = 'VICTORY';
-                        }
-                        else if (extendedCount === 5) {
+                        // Improved Gesture Logic
+                        if (extendedCount === 5 || extendedCount === 4) {
                             gesture = 'OPEN';
-                        } else if (extendedCount === 0) {
+                        } else if (extendedCount === 0 || extendedCount === 1) { // Tolerate thumb
                             gesture = 'CLOSED';
-                        } else if (extendedCount === 1 && indexExt) {
-                            gesture = 'POINTING';
-                        } else if (extendedCount === 2 && indexExt && thumbExt) {
-                            // "L" shape, usually treated as Pointing in this context
+                        } else if (indexExt && middleExt && !ringExt && !pinkyExt) {
+                            gesture = 'VICTORY';
+                        } else if (indexExt && !middleExt && !ringExt && !pinkyExt) {
                             gesture = 'POINTING';
                         }
 
                         // --- ROTATION LOGIC ---
-                        
-                        // 1. Yaw (Left/Right) - controlled by OPEN hand X position
                         let rotation = lastRotationRef.current;
                         if (gesture === 'OPEN') {
-                             // Map x (0..1) to (-1..1)
                              rotation = (1 - landmarks[0].x) * 2 - 1;
                              lastRotationRef.current = rotation;
                         }
 
-                        // 2. Pitch (Up/Down) - controlled by POINTING hand Y position
                         let pitch = lastPitchRef.current;
                         if (gesture === 'POINTING') {
-                            // Map y (0..1) to (-1..1) 
-                            // Note: Screen Y increases downwards. 
-                            // -1 (Top of screen) -> Rotate Up
-                            // 1 (Bottom of screen) -> Rotate Down
                             pitch = (landmarks[8].y - 0.5) * 2; 
                             lastPitchRef.current = pitch;
                         }
 
-                        // Calculate generic pinch distance for expansion fallback
+                        // Hand Openness (0 to 1) for smooth transitions
+                        // Calculate average distance of tips from wrist
                         const tips = [8, 12, 16, 20];
-                        const middleFingerMCP = landmarks[9];
-                        const handSize = Math.sqrt(
-                            Math.pow(middleFingerMCP.x - wrist.x, 2) + 
-                            Math.pow(middleFingerMCP.y - wrist.y, 2)
-                        );
                         let avgTipDist = 0;
                         tips.forEach(idx => {
                             const dx = landmarks[idx].x - wrist.x;
                             const dy = landmarks[idx].y - wrist.y;
                             avgTipDist += Math.sqrt(dx*dx + dy*dy);
                         });
-                        const opennessRatio = (avgTipDist / 4) / handSize;
+                        // Normalize somewhat arbitrarily based on hand size assumption
+                        const mcpDist = Math.sqrt(Math.pow(landmarks[9].x - wrist.x, 2) + Math.pow(landmarks[9].y - wrist.y, 2));
+                        const opennessRatio = Math.min(Math.max((avgTipDist / 4) / (mcpDist * 2.5), 0), 1);
 
                         onGestureUpdate({
                             isHandDetected: true,
@@ -240,16 +239,7 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                             pinchDistance: opennessRatio
                         });
                         
-                        // Debug Text on Canvas
-                        ctx.scale(-1, 1); // un-mirror for text
-                        ctx.translate(-canvas.width, 0);
-                        ctx.fillStyle = "white";
-                        ctx.font = "14px sans-serif";
-                        ctx.fillText(`Gesture: ${gesture}`, 10, 20);
-                        if (gesture === 'VICTORY') ctx.fillText('Mode: CHRISTMAS TEXT', 10, 40);
-
                     } else {
-                        // Keep last known states
                         onGestureUpdate({ 
                             isHandDetected: false, 
                             gesture: 'NEUTRAL', 
@@ -269,18 +259,16 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
     requestRef.current = requestAnimationFrame(predictLoop);
   };
 
-  // 4. Manual Retry / Start Handler
   const handleManualStart = () => {
       startCamera();
   };
 
-  // --- RENDER HELPERS ---
   const renderStatus = () => {
     if (cameraState === 'PERM_DENIED') {
         return (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/95 p-4 text-center z-10">
                 <AlertCircle className="w-8 h-8 text-white mb-2" />
-                <p className="text-white text-xs mb-3">Camera access blocked.</p>
+                <p className="text-white text-xs mb-3">Camera blocked. Please allow access.</p>
                 <button 
                   onClick={handleManualStart}
                   className="px-3 py-1 bg-white text-black text-xs font-bold rounded-full flex items-center gap-1 hover:bg-gray-200"
@@ -300,7 +288,6 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
         );
     }
     
-    // If ready but not playing (browsers blocked autoplay)
     if (cameraState === 'READY' && !isPlaying) {
         return (
              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 hover:bg-black/40 cursor-pointer group" onClick={() => {
@@ -312,7 +299,7 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
                 <div className="bg-white/20 p-3 rounded-full group-hover:scale-110 transition-transform backdrop-blur-md">
                     <Play className="w-6 h-6 text-white fill-white" />
                 </div>
-                <p className="text-white text-xs mt-2 font-semibold">Click to Start</p>
+                <p className="text-white text-xs mt-2 font-semibold">Start</p>
             </div>
         );
     }
@@ -323,33 +310,25 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onGestureUpdate }) => {
   return (
     <div className="fixed bottom-4 right-4 w-48 h-36 bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl z-50">
       <div className="relative w-full h-full">
-        {/* Video Element */}
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
           playsInline
           muted
         />
-        
-        {/* Debug Canvas */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover"
           width={640}
           height={480}
         />
-
-        {/* Status Overlay */}
         {renderStatus()}
-
-        {/* corner decoration */}
         <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur px-2 py-0.5 rounded text-[10px] text-white/70">
             <div className={`w-1.5 h-1.5 rounded-full ${isPlaying && aiState === 'READY' ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
-            <span>AI VISION</span>
+            <span>GESTURE</span>
         </div>
       </div>
       
-      {/* Explicit Retry Button if idle/error */}
       {(cameraState === 'ERROR' || (cameraState === 'IDLE' && aiState === 'ERROR')) && (
           <button 
             onClick={handleManualStart}
