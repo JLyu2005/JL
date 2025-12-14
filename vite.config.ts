@@ -4,13 +4,12 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // CRITICAL: Set base to './' so assets load correctly on GitHub Pages subdirectories
-  base: './', 
+  // Vercel 部署建议使用绝对路径 '/'
+  base: '/', 
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    // Helps with chunking large Three.js files to prevent loading errors
     rollupOptions: {
       output: {
         manualChunks: {
@@ -23,6 +22,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000
   },
   optimizeDeps: {
-    exclude: ['@mediapipe/tasks-vision'] // Prevent double-bundling issues with WASM
+    exclude: ['@mediapipe/tasks-vision']
   }
 });
